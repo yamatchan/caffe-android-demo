@@ -1,8 +1,10 @@
 package com.sh1r0.caffe_android_demo;
 
+import android.Manifest;
 import android.app.Activity;
 import android.app.ProgressDialog;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
 import android.database.Cursor;
 import android.graphics.Bitmap;
@@ -20,6 +22,7 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.sh1r0.caffe_android_lib.CaffeMobile;
 
@@ -48,6 +51,7 @@ public class MainActivity extends Activity implements CNNListener {
     private ProgressDialog dialog;
     private Bitmap bmp;
     private CaffeMobile caffeMobile;
+    private AppPermission appPermission;
     File sdcard = Environment.getExternalStorageDirectory();
     String modelDir = sdcard.getAbsolutePath() + "/caffe_mobile/bvlc_reference_caffenet";
     String modelProto = modelDir + "/deploy.prototxt";
@@ -61,6 +65,12 @@ public class MainActivity extends Activity implements CNNListener {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        appPermission = new AppPermission(this);
+        appPermission.checkReadExternalStorage();
+    }
+
+    public void initialize() {
         setContentView(R.layout.activity_main);
 
         ivCaptured = (ImageView) findViewById(R.id.ivCaptured);
@@ -69,11 +79,8 @@ public class MainActivity extends Activity implements CNNListener {
         btnCamera = (Button) findViewById(R.id.btnCamera);
         btnCamera.setOnClickListener(new Button.OnClickListener() {
             public void onClick(View v) {
-                initPrediction();
-                fileUri = getOutputMediaFileUri(MEDIA_TYPE_IMAGE);
-                Intent i = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-                i.putExtra(MediaStore.EXTRA_OUTPUT, fileUri);
-                startActivityForResult(i, REQUEST_IMAGE_CAPTURE);
+                if (appPermission.checkCamera() == false) return;
+                startCamera();
             }
         });
 
@@ -236,5 +243,32 @@ public class MainActivity extends Activity implements CNNListener {
             return true;
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        if (requestCode == AppPermission.REQUEST_PERMISSION) {
+            if (permissions[0].equals(Manifest.permission.READ_EXTERNAL_STORAGE)) {
+                if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    initialize();
+                } else {
+                    Toast toast = Toast.makeText(this, "You need to permit reading external storage", Toast.LENGTH_SHORT);
+                    toast.show();
+                    finish();
+                }
+            } else if (permissions[0].equals(Manifest.permission.CAMERA)) {
+                if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    startCamera();
+                }
+            }
+        }
+    }
+
+    public void startCamera() {
+        initPrediction();
+        fileUri = getOutputMediaFileUri(MEDIA_TYPE_IMAGE);
+        Intent i = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        i.putExtra(MediaStore.EXTRA_OUTPUT, fileUri);
+        startActivityForResult(i, REQUEST_IMAGE_CAPTURE);
     }
 }
